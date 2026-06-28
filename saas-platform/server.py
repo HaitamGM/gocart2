@@ -3,6 +3,7 @@ import base64
 import json
 import os
 
+import time
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +36,7 @@ MONGODB_URI = os.environ.get("MONGODB_URI")
 mongo_client = MongoClient(MONGODB_URI)
 db = mongo_client.get_database("ham_db")
 stores_col = db.get_collection("stores")
+clients_col = db.get_collection("clients")
 
 def get_store_config(api_key):
     return stores_col.find_one({"_id": api_key})
@@ -58,6 +60,8 @@ async def get_config(api_key: str):
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
+    start_time = time.time()
+    api_key = "unknown"
 
     # The first message from the client must be the setup configuration
     try:
@@ -87,20 +91,31 @@ async def websocket_endpoint(ws: WebSocket):
             print(f"DEBUG: NO MATCH in stores.json for {api_key}. Using settings from payload.")
             store_settings = config_payload.get("settings", {})
 
-        from utils import format_catalog_from_file, ANTI_GRAVITY_PROMPT_TEMPLATE
+        from utils import format_catalog_from_file, format_catalog_from_string, ANTI_GRAVITY_PROMPT_TEMPLATE
 
-        system_instruction = store_settings.get("system_instruction", "You are a helpful assistant.")
+        company_name = store_settings.get("companyName", "notre boutique")
         csv_path = store_settings.get("csv_path")
+        catalog_data = store_settings.get("catalog_data")
 
-        print(f"DEBUG: Looking for catalog at {csv_path} for apiKey {api_key}")
+        print(f"DEBUG: Looking for catalog for apiKey {api_key}")
 
-        if csv_path and os.path.exists(csv_path):
-            catalog_text = format_catalog_from_file(csv_path)
-            company_name = store_settings.get("companyName", "notre boutique")
-            system_instruction = ANTI_GRAVITY_PROMPT_TEMPLATE.replace("{CATALOG_PLACEHOLDER}", catalog_text).replace("{COMPANY_NAME}", company_name)
-            print(f"DEBUG: SUCCESS - Injected CSV catalog and company name '{company_name}' for store: {api_key}")
-        else:
-            print(f"DEBUG: WARNING - CSV NOT FOUND or NOT PROVIDED for {api_key}. Using fallback instruction.")
+        catalog_text = "Aucun produit disponible pour le moment."
+
+        # 1. Use data stored in MongoDB (Shared between services)
+        if catalog_data:
+            catalog_text = format_catalog_from_string(catalog_data)
+            print(f"DEBUG: SUCCESS - Loaded catalog from MongoDB for {api_key}")
+        # 2. Fallback to local file ONLY if MongoDB data is missing
+        elif csv_path:
+            if os.path.exists(csv_path):
+                catalog_text = format_catalog_from_file(csv_path)
+                print(f"DEBUG: SUCCESS - Loaded local file for {api_key}")
+            else:
+                print(f"DEBUG: FAILED - Catalog data not found in MongoDB or Local Disk for {api_key}")
+
+        # Always use our premium Darija system instruction
+        system_instruction = ANTI_GRAVITY_PROMPT_TEMPLATE.replace("{CATALOG_PLACEHOLDER}", catalog_text).replace("{COMPANY_NAME}", company_name)
+        print(f"DEBUG: System Instruction prepared for {company_name}")
 
         tools_schema = store_settings.get("tools", [])
 
@@ -229,7 +244,8 @@ async def websocket_endpoint(ws: WebSocket):
                 browser_to_gemini(),
                 gemini_to_browser(),
             )
-
+    except WebSocketDisconnect:
+        print(f"WebSocket disconnected for {api_key}")
     except Exception as e:
         print(f"Session error: {e}")
         import traceback
@@ -238,8 +254,23 @@ async def websocket_endpoint(ws: WebSocket):
             await ws.send_json({"type": "error", "message": str(e)})
         except Exception:
             pass
+    finally:
+        # Calculate and record usage
+        end_time = time.time()
+        duration_minutes = (end_time - start_time) / 60.0
+
+        if api_key != "unknown":
+            print(f"DEBUG: Recording usage for {api_key}: {duration_minutes:.2f} minutes")
+            try:
+                # Update both collections to keep them in sync
+                stores_col.update_one({"_id": api_key}, {"$inc": {"usageMinutes": duration_minutes}})
+                clients_col.update_one({"_id": api_key}, {"$inc": {"usageMinutes": duration_minutes}})
+            except Exception as mongo_err:
+                print(f"ERROR: Failed to update usage in MongoDB: {mongo_err}")
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    import os
+    port = int(os.environ.get("PORT", 8001))
+    uvicorn.run(app, host="0.0.0.0", port=port)
