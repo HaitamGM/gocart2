@@ -34,6 +34,46 @@ function h(level, text, color = BLUE_DARK) {
   });
 }
 
+
+function placeholderDiagram(title) {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: { style: BorderStyle.DASHED, size: 2, color: BLUE_DARK },
+      bottom: { style: BorderStyle.DASHED, size: 2, color: BLUE_DARK },
+      left: { style: BorderStyle.DASHED, size: 2, color: BLUE_DARK },
+      right: { style: BorderStyle.DASHED, size: 2, color: BLUE_DARK }
+    },
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            shading: { fill: "F8FAFC" },
+            verticalAlign: VerticalAlign.CENTER,
+            children: [
+              spacer(400),
+              p(`[ EMPLACEMENT RÉSERVÉ : ${title} ]`, { center: true, bold: true, color: BLUE_MID }),
+              p(`(Veuillez insérer l'image du diagramme ici avant l'impression)`, { center: true, italic: true }),
+              spacer(400)
+            ]
+          })
+        ]
+      })
+    ]
+  });
+}
+
+
+
+function codeSnippet(codeStr) {
+  return new Paragraph({
+    shading: { type: ShadingType.CLEAR, color: "auto", fill: GRAY_BG },
+    spacing: { before: 120, after: 120, line: 360 },
+    children: [new TextRun({ text: codeStr, size: 18, font: "Courier New", color: "1E293B" })]
+  });
+}
+
+
 function p(text, opts = {}) {
   return new Paragraph({
     alignment: opts.center ? AlignmentType.CENTER : opts.justify ? AlignmentType.JUSTIFIED : AlignmentType.LEFT,
@@ -368,7 +408,7 @@ const introduction = [
   spacer(120),
   p("Le commerce électronique connaît une croissance exponentielle à l'échelle mondiale, et le Maroc ne fait pas exception à cette tendance. Selon les dernières statistiques, le marché du e-commerce marocain a enregistré une progression constante, portée par l'essor de la connectivité mobile et la démocratisation des paiements numériques. Toutefois, une barrière persiste pour une large frange de la population : la langue.", { justify: true, lineSpacing: 340, after: 140 }),
   p("La plupart des interfaces de commerce en ligne sont développées en arabe formel, en français ou en anglais, laissant de côté la Darija marocaine — dialecte arabe local parlé au quotidien par la quasi-totalité des Marocains. Cette inadéquation linguistique crée une distance entre le consommateur et le produit, limitant ainsi l'expérience utilisateur et le potentiel de conversion.", { justify: true, lineSpacing: 340, after: 140 }),
-  p("C'est dans ce contexte qu'a émergé l'idée de Ham Voice : une plateforme SaaS (Software as a Service) qui permet aux marchands e-commerce d'intégrer un assistant vocal intelligent, capable de communiquer naturellement en Darija marocaine. Alimenté par l'API Gemini Live de Google, cet assistant offre une expérience d'achat conversationnelle, intuitive et culturellement adaptée.", { justify: true, lineSpacing: 340, after: 140 }),
+  p("C'est dans ce contexte qu'a émergé l'idée de Ham Voice : une plateforme SaaS (Software as a Service) qui intègre un assistant vocal interactif en Darija marocaine. Le système repose sur l'API Gemini 3.1 Flash Live de Google, communiquant en temps réel via WebSockets avec un backend Python FastAPI, et stockant les données via MongoDB. Cette plateforme permet aux marchands e-commerce d'intégrer un assistant vocal intelligent : une plateforme SaaS (Software as a Service) qui permet aux marchands e-commerce d'intégrer un assistant vocal intelligent, capable de communiquer naturellement en Darija marocaine. Alimenté par l'API Gemini Live de Google, cet assistant offre une expérience d'achat conversationnelle, intuitive et culturellement adaptée.", { justify: true, lineSpacing: 340, after: 140 }),
   spacer(80),
   subTitle("", "Objectifs du Stage"),
   p("Ce stage de fin d'études avait pour objectifs principaux de :", { after: 60 }),
